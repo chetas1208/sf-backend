@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import ipaddress
-import os
 import urllib.request
+
+from app.config import get_settings
 
 
 def probe_host(configured_host: str) -> str:
@@ -27,8 +28,9 @@ def probe_host(configured_host: str) -> str:
 def health_url(host: str | None = None, port: str | None = None) -> str:
     """Build the health endpoint URL from the container's runtime settings."""
 
-    configured_host = host if host is not None else os.getenv("CONTACTS_HOST", "127.0.0.1")
-    configured_port = port if port is not None else os.getenv("CONTACTS_PORT", "8000")
+    settings = get_settings()
+    configured_host = host if host is not None else settings.host
+    configured_port = port if port is not None else str(settings.port)
     return f"http://{probe_host(configured_host)}:{configured_port}/health"
 
 
