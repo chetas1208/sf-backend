@@ -36,6 +36,10 @@ database-backed healthcheck at `/health`. For the complete frontend + backend
 stack, run `docker compose up --build` from the workspace directory containing
 both `sf-backend` and `sf-frontend`.
 
+`requirements.lock` pins the runtime and image build dependencies. Refresh it
+deliberately as a group from a known-good Python 3.13 environment, then run the
+test suite and rebuild the image before committing the new pins.
+
 ### Pull request reviews
 
 Authorized pull requests are automatically reviewed by Qodo. Keep a new pull

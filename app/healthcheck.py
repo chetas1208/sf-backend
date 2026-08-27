@@ -8,6 +8,9 @@ import urllib.request
 from app.config import get_settings
 
 
+_DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def probe_host(configured_host: str) -> str:
     """Return a routable probe host for an application bind address."""
 
@@ -35,7 +38,7 @@ def health_url(host: str | None = None, port: str | None = None) -> str:
 
 
 def main() -> None:
-    with urllib.request.urlopen(health_url(), timeout=2) as response:
+    with _DIRECT_OPENER.open(health_url(), timeout=2) as response:
         if response.status >= 400:
             raise RuntimeError(f"healthcheck returned HTTP {response.status}")
 

@@ -1,4 +1,4 @@
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-bookworm@sha256:c45a22ea000adfd9cda29364bbe7edd23001ce5cc2ad15857cfbf7766943b9ca
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -14,11 +14,15 @@ RUN addgroup --system app && adduser --system --ingroup app app \
     && mkdir /data \
     && chown app:app /data
 
-COPY pyproject.toml ./
+COPY pyproject.toml requirements.lock ./
+
+# Install exact runtime and build dependencies before installing this package.
+RUN pip install --no-cache-dir --requirement requirements.lock
+
 COPY app ./app
 
-# Install only the production dependencies declared in pyproject.toml.
-RUN pip install --no-cache-dir .
+# The build backend is already pinned above, so no mutable build isolation is needed.
+RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 
 USER app
 
