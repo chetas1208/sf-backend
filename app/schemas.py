@@ -1,6 +1,36 @@
+import base64
+import binascii
+import re
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+
+PHOTO_MAX_BYTES = 2 * 1024 * 1024
+_PHOTO_DATA_URL = re.compile(
+    r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]*={0,2})$"
+)
+
+
+def _validate_photo(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    match = _PHOTO_DATA_URL.fullmatch(value)
+    if match is None:
+        raise ValueError("Photo must be a JPEG, PNG, or WebP Base64 data URL")
+
+    encoded = match.group(2)
+    if not encoded:
+        raise ValueError("Photo data must not be empty")
+
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Photo data is not valid Base64") from exc
+
+    if len(decoded) > PHOTO_MAX_BYTES:
+        raise ValueError("Photo must be 2 MiB or smaller")
+    return value
 
 
 class ContactBase(BaseModel):
@@ -44,6 +74,13 @@ class ContactBase(BaseModel):
         description="Role held at the company.",
         examples=["Mathematician"],
     )
+    photo: str | None = Field(
+        default=None,
+        description=(
+            "Optional JPEG, PNG, or WebP image as a Base64 data URL. "
+            "Decoded image data must be no larger than 2 MiB."
+        ),
+    )
     address: str | None = Field(
         default=None,
         max_length=300,
@@ -69,6 +106,8 @@ class ContactBase(BaseModel):
         description="Free-form notes about the contact. No length limit.",
         examples=["Met at the SF hackathon."],
     )
+
+    _validate_photo_field = field_validator("photo")(_validate_photo)
 
 
 _FULL_EXAMPLE = {
@@ -128,12 +167,15 @@ class ContactUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=40, description="New phone number.")
     company: str | None = Field(default=None, max_length=200, description="New company.")
     job_title: str | None = Field(default=None, max_length=200, description="New job title.")
+    photo: str | None = Field(default=None, description="New Base64 image data URL, or null to remove it.")
     address: str | None = Field(default=None, max_length=300, description="New street address.")
     city: str | None = Field(default=None, max_length=120, description="New city.")
     state: str | None = Field(default=None, max_length=120, description="New state or region.")
     postal_code: str | None = Field(default=None, max_length=20, description="New postal code.")
     country: str | None = Field(default=None, max_length=120, description="New country.")
     notes: str | None = Field(default=None, description="New notes; replaces the existing text.")
+
+    _validate_photo_field = field_validator("photo")(_validate_photo)
 
 
 class ContactRead(ContactBase):
