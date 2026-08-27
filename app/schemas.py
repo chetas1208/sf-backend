@@ -2,6 +2,7 @@ import base64
 import binascii
 import re
 from datetime import datetime, timezone
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
@@ -33,7 +34,51 @@ def _validate_photo(value: str | None) -> str | None:
     return value
 
 
-class ContactBase(BaseModel):
+class AddressType(str, Enum):
+    HOME = "Home"
+    WORK = "Work"
+    OTHER = "Other"
+
+
+class AddressBase(BaseModel):
+    """Postal fields shared by nested address request and response models."""
+
+    type: AddressType = Field(description="Address category.", examples=["Home"])
+    address: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Street address, including unit or suite.",
+        examples=["1 Market St, Suite 400"],
+    )
+    city: str | None = Field(default=None, max_length=120, description="City or locality.", examples=["San Francisco"])
+    state: str | None = Field(
+        default=None,
+        max_length=120,
+        description="State, province, or region.",
+        examples=["CA"],
+    )
+    postal_code: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Postal or ZIP code.",
+        examples=["94105"],
+    )
+    country: str | None = Field(default=None, max_length=120, description="Country name.", examples=["USA"])
+
+
+class AddressCreate(AddressBase):
+    """Nested address submitted while creating or replacing a contact."""
+
+
+class AddressRead(AddressBase):
+    """Stored nested address returned with a contact."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Server-assigned address identifier.", examples=[1])
+
+
+class ContactFields(BaseModel):
     """Fields shared by every contact request and response."""
 
     first_name: str = Field(
@@ -81,26 +126,6 @@ class ContactBase(BaseModel):
             "Decoded image data must be no larger than 2 MiB."
         ),
     )
-    address: str | None = Field(
-        default=None,
-        max_length=300,
-        description="Street address, including unit or suite.",
-        examples=["1 Market St, Suite 400"],
-    )
-    city: str | None = Field(default=None, max_length=120, description="City or locality.", examples=["San Francisco"])
-    state: str | None = Field(
-        default=None,
-        max_length=120,
-        description="State, province, or region.",
-        examples=["CA"],
-    )
-    postal_code: str | None = Field(
-        default=None,
-        max_length=20,
-        description="Postal or ZIP code.",
-        examples=["94105"],
-    )
-    country: str | None = Field(default=None, max_length=120, description="Country name.", examples=["USA"])
     notes: str | None = Field(
         default=None,
         description="Free-form notes about the contact. No length limit.",
@@ -117,23 +142,33 @@ _FULL_EXAMPLE = {
     "phone": "+1-415-555-0101",
     "company": "Analytical Engines",
     "job_title": "Mathematician",
-    "address": "1 Market St, Suite 400",
-    "city": "San Francisco",
-    "state": "CA",
-    "postal_code": "94105",
-    "country": "USA",
+    "addresses": [
+        {
+            "type": "Home",
+            "address": "1 Market St, Suite 400",
+            "city": "San Francisco",
+            "state": "CA",
+            "postal_code": "94105",
+            "country": "USA",
+        }
+    ],
     "notes": "Met at the SF hackathon.",
 }
 _MINIMAL_EXAMPLE = {"first_name": "Grace", "last_name": "Hopper", "email": "grace@example.com"}
 
 
-class ContactCreate(ContactBase):
+class ContactCreate(ContactFields):
     """Body of `POST /api/v1/contacts`. Only the two names and email are required."""
 
     model_config = ConfigDict(json_schema_extra={"examples": [_FULL_EXAMPLE, _MINIMAL_EXAMPLE]})
 
+    addresses: list[AddressCreate] = Field(
+        default_factory=list,
+        description="Zero or more postal addresses owned by this contact.",
+    )
 
-class ContactReplace(ContactBase):
+
+class ContactReplace(ContactFields):
     """
     Body of `PUT /api/v1/contacts/{contact_id}`.
 
@@ -142,6 +177,11 @@ class ContactReplace(ContactBase):
     """
 
     model_config = ConfigDict(json_schema_extra={"examples": [_FULL_EXAMPLE]})
+
+    addresses: list[AddressCreate] = Field(
+        default_factory=list,
+        description="The complete replacement address collection; send an empty list to remove all addresses.",
+    )
 
 
 class ContactUpdate(BaseModel):
@@ -168,17 +208,16 @@ class ContactUpdate(BaseModel):
     company: str | None = Field(default=None, max_length=200, description="New company.")
     job_title: str | None = Field(default=None, max_length=200, description="New job title.")
     photo: str | None = Field(default=None, description="New Base64 image data URL, or null to remove it.")
-    address: str | None = Field(default=None, max_length=300, description="New street address.")
-    city: str | None = Field(default=None, max_length=120, description="New city.")
-    state: str | None = Field(default=None, max_length=120, description="New state or region.")
-    postal_code: str | None = Field(default=None, max_length=20, description="New postal code.")
-    country: str | None = Field(default=None, max_length=120, description="New country.")
+    addresses: list[AddressCreate] | None = Field(
+        default=None,
+        description="If supplied, replaces the complete address collection; omitted preserves it.",
+    )
     notes: str | None = Field(default=None, description="New notes; replaces the existing text.")
 
     _validate_photo_field = field_validator("photo")(_validate_photo)
 
 
-class ContactRead(ContactBase):
+class ContactRead(ContactFields):
     """A stored contact, as returned by every contact endpoint."""
 
     model_config = ConfigDict(
@@ -197,6 +236,10 @@ class ContactRead(ContactBase):
     )
 
     id: int = Field(description="Server-assigned identifier.", examples=[1])
+    addresses: list[AddressRead] = Field(
+        default_factory=list,
+        description="Postal addresses owned by this contact.",
+    )
     created_at: datetime = Field(
         description="UTC timestamp of when the contact was created.",
         examples=["2026-08-19T16:22:58.189507Z"],

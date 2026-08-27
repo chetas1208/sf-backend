@@ -29,9 +29,6 @@ def payload() -> dict:
         "phone": "+1-415-555-0101",
         "company": "Analytical Engines",
         "job_title": "Mathematician",
-        "city": "San Francisco",
-        "state": "CA",
-        "postal_code": "94105",
-        "country": "USA",
+        "addresses": [],
         "notes": "First programmer.",
     }
