@@ -104,14 +104,20 @@ also read):
 ### Contact fields
 
 `first_name` and `last_name` are required; `email` is required and unique
-(case-insensitive). Everything else is optional.
+(case-insensitive). Everything else is optional. A contact can own zero or more
+normalized addresses, each typed `Home`, `Work`, or `Other`.
 
 ```
 first_name, last_name, email, phone, company, job_title,
-address, city, state, postal_code, country, notes
+photo, notes, addresses[]
 ```
 
 Responses add `id`, `full_name`, `created_at`, and `updated_at` (UTC).
+
+`addresses` is a nested collection with `type`, `address`, `city`, `state`,
+`postal_code`, and `country` fields. `PUT` replaces the complete collection;
+omitting it clears all addresses. `PATCH` preserves it when omitted and replaces
+it when supplied.
 
 ### List query parameters
 
@@ -141,7 +147,8 @@ List responses are wrapped so clients can paginate:
 curl -X POST http://127.0.0.1:8000/api/v1/contacts \
   -H 'content-type: application/json' \
   -d '{"first_name":"Katherine","last_name":"Johnson","email":"katherine@example.com",
-       "phone":"+1-757-555-0199","company":"NASA","job_title":"Mathematician"}'
+       "phone":"+1-757-555-0199","company":"NASA","job_title":"Mathematician",
+       "addresses":[{"type":"Work","city":"Washington","country":"USA"}]}'
 
 # Search + paginate
 curl "http://127.0.0.1:8000/api/v1/contacts?search=nasa&limit=10&sort_by=last_name"
@@ -170,7 +177,7 @@ app/
   main.py             FastAPI app, lifespan startup, /health and /
   config.py           Environment-driven settings
   database.py         Engine, session factory, StaticPool in-memory wiring
-  models.py           Contact ORM model
+  models.py           Contact and normalized Address ORM models
   schemas.py          Pydantic request/response models
   crud.py             Database operations (search, sort, paginate)
   seed.py             Sample contacts for the in-memory default
