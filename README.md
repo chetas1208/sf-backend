@@ -19,6 +19,33 @@ Alternatively, with uvicorn directly (adds `--reload`):
 .venv/bin/uvicorn app.main:app --reload
 ```
 
+### Docker
+
+Build and run the production image directly:
+
+```bash
+docker build -t sf-backend .
+docker run --rm --name sf-backend \
+  -p 8000:8000 \
+  -v sf-contacts-data:/data \
+  sf-backend
+```
+
+The image runs as a non-root user, stores SQLite data in `/data`, and exposes a
+database-backed healthcheck at `/health`. For the complete frontend + backend
+stack, run `docker compose up --build` from the workspace directory containing
+both `sf-backend` and `sf-frontend`.
+
+`requirements.lock` pins the runtime and image build dependencies. Refresh it
+deliberately as a group from a known-good Python 3.13 environment, then run the
+test suite and rebuild the image before committing the new pins.
+
+### Pull request reviews
+
+Authorized pull requests are automatically reviewed by Qodo. Keep a new pull
+request open until the review completes; follow-up requests can use `/review`,
+`/improve`, or `/ask` in a pull-request comment.
+
 ## Interactive API docs
 
 FastAPI generates an OpenAPI schema from the route signatures and Pydantic models, so
